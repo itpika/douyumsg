@@ -20,7 +20,7 @@ import "github.com/dalgurak007/go-douyuchatmsg"
 
 func main() {
   // 根据房间号码获取一个房间
-  room := client.NewRoom("122402")
+  room := douyumsg.NewRoom("122402")
   // 与服务器建立连接
   go room.Run()
   // 获取弹幕消息，传入chan缓冲区大小，返回一个chan
