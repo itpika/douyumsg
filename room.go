@@ -3,7 +3,7 @@ package douyumsg
 import (
 	"log"
 	"net"
-	"protocol"
+	"github.com/dalgurak007/douyumsg/protocol"
 	"time"
 )
 
