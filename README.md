@@ -7,12 +7,12 @@ ___
 #### 安装
 
 ```
-go get -u github.com/dalgurak007/go-douyuchatmsg
+go get -u github.com/dalgurak007/douyumsg
 ```
 #### 导入
 
 ```
-import "github.com/dalgurak007/go-douyuchatmsg"
+import "github.com/dalgurak007/douyumsg"
 ```
 #### 快速开始
 
