@@ -1,10 +1,12 @@
 package douyumsg
 
 import (
+	"encoding/binary"
 	"log"
 	"net"
-	"github.com/dalgurak007/douyumsg/protocol"
 	"time"
+
+	"github.com/dalgurak007/douyumsg/protocol"
 )
 
 const (
@@ -49,13 +51,25 @@ func (r *Room) Run() error {
 
 // 接收服务器返回的消息
 func receiveMsg(r *Room) {
-	b := make([]byte, 4039)
 	for {
-		n, err := r.conn.Read(b)
+		// 读取协议头
+		h := make([]byte, protocol.HeadLen*2+protocol.MsgTypeLen+protocol.KeepLen)
+		n, err := r.conn.Read(h)
 		if err != nil {
 			log.Println("[ERROR]:", err)
 			return
 		}
+		// log.Println("data", h[:n])
+		// 读取body
+		b := make([]byte, int(binary.LittleEndian.Uint32(h[0:4]))-int(protocol.HeadLen+protocol.MsgTypeLen+protocol.KeepLen))
+		n, err = r.conn.Read(b)
+		if err != nil {
+			log.Println("[ERROR]:", err)
+			return
+		}
+
+		// log.Println("data", len(b[:n]), b[:n])
+		// return
 		data, err := protocol.ByteToMsg(b[:n])
 		if err != nil {
 			log.Println("[ERROR]:", err)

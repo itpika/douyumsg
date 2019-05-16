@@ -1,16 +1,16 @@
 package protocol
 
 import (
-	"bytes"
+	// "bytes"
 	"encoding/binary"
-	"io"
+	// "io"
 	"strings"
 )
 
 const (
-	headLen    uint32 = 4
-	msgTypeLen uint32 = 2
-	keepLen    uint32 = 2
+	HeadLen    uint32 = 4
+	MsgTypeLen uint32 = 2
+	KeepLen    uint32 = 2
 )
 
 // 序列化消息
@@ -55,7 +55,7 @@ func combinationProtocolHead(msg map[string]string) []byte {
 	// fmt.Println(s, len(s))
 
 	// 计算头长度
-	head := make([]byte, headLen*2+msgTypeLen+keepLen)
+	head := make([]byte, HeadLen*2+MsgTypeLen+KeepLen)
 	// head := make([]byte, 0)
 
 	body := []byte(s)
@@ -64,11 +64,13 @@ func combinationProtocolHead(msg map[string]string) []byte {
 
 	totalLen := uint32(len(head) + len(body))
 	// fmt.Println(totalLen)
-	binary.LittleEndian.PutUint32(head, totalLen-headLen)
-	binary.LittleEndian.PutUint32(head[4:], totalLen-headLen)
+	binary.LittleEndian.PutUint32(head, totalLen-HeadLen)
+	binary.LittleEndian.PutUint32(head[4:], totalLen-HeadLen)
 	binary.LittleEndian.PutUint16(head[8:], 689)
 	binary.LittleEndian.PutUint16(head[10:], 0)
-	// fmt.Println(head)
+	// fmt.Println("head", len(head), head)
+	// fmt.Println("body", len(body), body)
+	// fmt.Println("sum", len(append(head, body...)), append(head, body...))
 	return append(head, body...)
 }
 
@@ -81,39 +83,48 @@ func MsgToByte(msg map[string]string) []byte {
 
 // 解析数据
 func ByteToMsg(data []byte) (m map[string]string, err error) {
-	if uint32(len(data)) <= headLen*2+msgTypeLen+keepLen {
-		return
-	}
-	reader := bytes.NewReader(data)
-	// fmt.Println(data)
-
-	sli := make([]byte, 4)
-	_, e := reader.ReadAt(sli, 0)
-	if e != nil {
-		err = e
-		return
-	}
-	_, e = reader.ReadAt(sli, 4)
-	if e != nil {
-		err = e
-		return
-	}
-	sli = make([]byte, 2)
-	_, e = reader.ReadAt(sli, 8)
-	if e != nil {
-		err = e
-		return
-	}
-	sli = make([]byte, len(data))
-	n, e := reader.ReadAt(sli, 12)
-	if e != nil && e != io.EOF {
-		err = e
-		return
-	}
-	// fmt.Println(sli[:n])
-	str := string(sli[:n])
+	str := string(data)
 
 	// 反序列化
 	m = unserializeMsg(str)
 	return
 }
+
+// // 解析数据
+// func ByteToMsg(data []byte) (m map[string]string, err error) {
+// 	if uint32(len(data)) <= HeadLen*2+MsgTypeLen+KeepLen {
+// 		return
+// 	}
+// 	reader := bytes.NewReader(data)
+// 	// fmt.Println(data)
+
+// 	sli := make([]byte, 4)
+// 	_, e := reader.ReadAt(sli, 0)
+// 	if e != nil {
+// 		err = e
+// 		return
+// 	}
+// 	_, e = reader.ReadAt(sli, 4)
+// 	if e != nil {
+// 		err = e
+// 		return
+// 	}
+// 	sli = make([]byte, 2)
+// 	_, e = reader.ReadAt(sli, 8)
+// 	if e != nil {
+// 		err = e
+// 		return
+// 	}
+// 	sli = make([]byte, len(data))
+// 	n, e := reader.ReadAt(sli, 12)
+// 	if e != nil && e != io.EOF {
+// 		err = e
+// 		return
+// 	}
+// 	// fmt.Println(sli[:n])
+// 	str := string(sli[:n])
+
+// 	// 反序列化
+// 	m = unserializeMsg(str)
+// 	return
+// }
