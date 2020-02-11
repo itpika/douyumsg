@@ -10,7 +10,6 @@ import (
 )
 
 const (
-	addr    = "openbarrage.douyutv.com:8601" // 服务器地址
 	heartbe = "30s"                          // 心跳时间
 )
 
@@ -31,7 +30,7 @@ func NewRoom(roomId string) *Room {
 }
 
 // 运行这个room
-func (r *Room) Run() error {
+func (r *Room) Run(addr string) error {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		return err
