@@ -9,12 +9,12 @@ package main
 #### 安装
 
 ```
-go get -u github.com/dalgurak007/douyumsg
+go get -u github.com/itpika/douyumsg
 ```
 #### 导入
 
 ```
-import "github.com/dalgurak007/douyumsg"
+import "github.com/itpika/douyumsg"
 ```
 #### 快速开始
 
@@ -23,7 +23,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/dalgurak007/douyumsg"
+	"github.com/itpika/douyumsg"
 	"os"
 	"runtime"
 )
@@ -68,9 +68,9 @@ func main() {
 
 ##### 斗鱼服务消息格式参考
 
-* https://github.com/dalgurak007/go-douyuchatmsg/blob/master/%E6%96%97%E9%B1%BC%E5%BC%B9%E5%B9%95%E6%9C%8D%E5%8A%A1%E5%99%A8%E7%AC%AC%E4%B8%89%E6%96%B9%E6%8E%A5%E5%85%A5%E5%8D%8F%E8%AE%AEv1.6.2.pdf
+* https://github.com/itpika/douyumsg/blob/master/%E6%96%97%E9%B1%BC%E5%BC%B9%E5%B9%95%E6%9C%8D%E5%8A%A1%E5%99%A8%E7%AC%AC%E4%B8%89%E6%96%B9%E6%8E%A5%E5%85%A5%E5%8D%8F%E8%AE%AEv1.6.2.pdf
 
 
 ___
-作者： dalgurak007
+作者： itpika
 欢迎大家加入开发。
