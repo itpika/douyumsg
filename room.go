@@ -2,15 +2,14 @@ package douyumsg
 
 import (
 	"encoding/binary"
+	"github.com/itpika/douyumsg/protocol"
 	"log"
 	"net"
 	"time"
-
-	"github.com/dalgurak007/douyumsg/protocol"
 )
 
 const (
-	heartbe = "30s"                          // 心跳时间
+	heartbe = "30s" // 心跳时间
 )
 
 // room对象可以与服务器建立tcp连接，并与之通信
