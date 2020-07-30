@@ -2,7 +2,9 @@ package protocol
 
 import (
 	// "bytes"
+	"bytes"
 	"encoding/binary"
+
 	// "io"
 	"strings"
 )
@@ -14,12 +16,13 @@ const (
 )
 
 // 序列化消息
-func serializeMsg(msg map[string]string) (str string) {
+func serializeMsg(msg map[string]string) string {
+	var buf bytes.Buffer
 	for k, v := range msg {
-		str += k + "@=" + v + "/"
+		buf.WriteString(k + "@=" + v + "/")
 	}
-	str += string(0)
-	return
+	buf.WriteByte(0)
+	return buf.String()
 }
 
 // 反序列化消息
@@ -89,42 +92,3 @@ func ByteToMsg(data []byte) (m map[string]string, err error) {
 	m = unserializeMsg(str)
 	return
 }
-
-// // 解析数据
-// func ByteToMsg(data []byte) (m map[string]string, err error) {
-// 	if uint32(len(data)) <= HeadLen*2+MsgTypeLen+KeepLen {
-// 		return
-// 	}
-// 	reader := bytes.NewReader(data)
-// 	// fmt.Println(data)
-
-// 	sli := make([]byte, 4)
-// 	_, e := reader.ReadAt(sli, 0)
-// 	if e != nil {
-// 		err = e
-// 		return
-// 	}
-// 	_, e = reader.ReadAt(sli, 4)
-// 	if e != nil {
-// 		err = e
-// 		return
-// 	}
-// 	sli = make([]byte, 2)
-// 	_, e = reader.ReadAt(sli, 8)
-// 	if e != nil {
-// 		err = e
-// 		return
-// 	}
-// 	sli = make([]byte, len(data))
-// 	n, e := reader.ReadAt(sli, 12)
-// 	if e != nil && e != io.EOF {
-// 		err = e
-// 		return
-// 	}
-// 	// fmt.Println(sli[:n])
-// 	str := string(sli[:n])
-
-// 	// 反序列化
-// 	m = unserializeMsg(str)
-// 	return
-// }

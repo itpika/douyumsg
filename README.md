@@ -23,35 +23,47 @@ package main
 
 import (
 	"fmt"
-	"github.com/itpika/douyumsg"
 	"os"
 	"runtime"
+
+	"github.com/itpika/douyumsg"
 )
 
 func main() {
 	// 根据房间号码获取一个房间
-	room := douyumsg.NewRoom("122402")
+	room := douyumsg.NewRoom("276200")
 	// 与服务器建立连接
-	go func() {
-		err := room.Run("openapi-danmu.douyu.com:8601")
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-	}()
+	err := room.Run("openapi-danmu.douyu.com:8601")
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	room.SetHeart(7)              // 设置心跳时间间隔,，默认30s
+	room.SetBarrageChanSize(200)  // 设置弹幕消息channel大小，默认100
+	room.SetUserEnterChanSize(20) // 设置弹幕消息channel大小，默认50
+	room.SetAllMsgChanSize(400)   // 设置弹幕消息channel大小，默认300
 	// 获取弹幕消息，传入chan缓冲区大小，返回一个chan
 	go func() {
-		msg := room.ReceiveBarrage(100)
+		msg := room.ReceiveBarrage()
 		for {
 			m := <-msg
+			if m == nil {
+				println("弹幕消息通道关闭")
+				break
+			}
 			fmt.Println("level:", m["level"], m["nn"], ":", m["txt"])
 		}
 	}()
 	// 获取用户进入房间通知
 	go func() {
-		msg := room.JoinRoom(0)
+		msg := room.UserEnterRoom()
 		for {
 			m := <-msg
+			if m == nil {
+				println("进入房间通道关闭")
+				break
+			}
 			fmt.Println("用户：", "level:", m["level"], m["nn"], "进入直播间")
 		}
 	}()
@@ -60,7 +72,8 @@ func main() {
 	//	msg := <-room.ReceiveAll(100)
 	//	fmt.Println(msg)
 	//}
-
+	// time.Sleep(time.Second * 5)
+	// room.Stop()
 	runtime.Goexit()
 }
 

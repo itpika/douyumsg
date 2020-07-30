@@ -2,80 +2,161 @@ package douyumsg
 
 import (
 	"encoding/binary"
-	"github.com/itpika/douyumsg/protocol"
-	"log"
+	"io"
 	"net"
+	"sync"
 	"time"
+
+	"github.com/itpika/douyumsg/lib/common"
+	"github.com/itpika/douyumsg/lib/logger"
+	"github.com/itpika/douyumsg/protocol"
 )
 
-const (
-	heartbe = "30s" // 心跳时间
-)
+type msgChannel struct {
+	channel chan map[string]string
+	open    bool
+}
 
 // room对象可以与服务器建立tcp连接，并与之通信
 type Room struct {
-	RoomId                                  string
-	conn                                    net.Conn
-	login                                   chan bool
-	barrageSwitch, allMsgSwitch, joinSwitch bool
-	barrage, allMsg, join                   chan map[string]string
-	bool
-	logout chan bool
+	RoomId                                             string
+	conn                                               net.Conn
+	heart                                              int64
+	barrageSwitch, allMsgSwitch, userEnterSwitch       bool
+	barrageChanSize, allMsgChanSize, userEnterChanSize int64
+	barrage, allMsg, userEnter                         chan map[string]string
+	exit                                               bool
+	wg                                                 sync.WaitGroup
 }
 
-// 返回一个room指针
+/*
+	构建一个room，返回这个room指针
+*/
 func NewRoom(roomId string) *Room {
-	return &Room{RoomId: roomId, login: make(chan bool), logout: make(chan bool)}
+	return &Room{RoomId: roomId}
 }
 
-// 运行这个room
+/*
+	设置心态消息频率(秒)
+*/
+func (r *Room) SetHeart(heartSecond int64) {
+	r.heart = heartSecond
+}
+
+/*
+	运行这个room
+*/
 func (r *Room) Run(addr string) error {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
+		logger.Err(err)
 		return err
 	}
-	defer conn.Close()
 	r.conn = conn
-
-	conn.Write(protocol.MsgToByte(map[string]string{
+	// 登录弹幕服务器
+	if _, err := conn.Write(protocol.MsgToByte(map[string]string{
 		"type":   "loginreq",
 		"roomid": r.RoomId,
-	}))
-	go receiveMsg(r)
+	})); err != nil {
+		logger.Err(err)
+		return err
+	}
 	go r.keepConnection()
-	<-r.logout
+	go r.receiveMsg()
 	return nil
 }
 
-// 接收服务器返回的消息
-func receiveMsg(r *Room) {
+/*
+	停止这个room
+*/
+func (r *Room) Stop() {
+	r.exit = true
+	r.wg.Wait()
+	r.conn.Close()
+	logger.Infof("The leave room %s successful\n", r.RoomId)
+}
+
+/*
+	room客户端与服务器保持连接
+*/
+func (r *Room) keepConnection() error {
+	time.Sleep(time.Second * 3)
+	r.wg.Add(1)
+
 	for {
+		if r.exit {
+			// 登出
+			r.conn.Write(protocol.MsgToByte(map[string]string{
+				"type": "logout",
+			}))
+			logger.Info("keepConnection exit")
+			r.wg.Done()
+			break
+		}
+		// 发送心跳消息
+		if _, err := r.conn.Write(protocol.MsgToByte(map[string]string{
+			"type": "mrkl",
+		})); err != nil {
+			return err
+		}
+		var second int64
+		if r.heart > 0 {
+			second = r.heart
+		} else {
+			second = common.Heartbe
+		}
+		time.Sleep(time.Second * time.Duration(second))
+	}
+	return nil
+}
+
+/*
+	接收服务器返回的消息
+*/
+func (r *Room) receiveMsg() {
+	r.wg.Add(1)
+	for {
+		if r.exit {
+			if r.userEnterSwitch {
+				close(r.userEnter)
+			}
+			if r.allMsgSwitch {
+				close(r.allMsg)
+			}
+			if r.barrageSwitch {
+				close(r.barrage)
+			}
+			r.wg.Done()
+			logger.Info("receiveMsg exit")
+			break
+		}
 		// 读取协议头
 		h := make([]byte, protocol.HeadLen*2+protocol.MsgTypeLen+protocol.KeepLen)
 		n, err := r.conn.Read(h)
 		if err != nil {
-			log.Println("[ERROR]:", err)
-			return
+			if err == io.EOF {
+				continue
+			}
+			logger.Err(err)
+			continue
 		}
-		// log.Println("data", h[:n])
 		// 读取body
 		b := make([]byte, int(binary.LittleEndian.Uint32(h[0:4]))-int(protocol.HeadLen+protocol.MsgTypeLen+protocol.KeepLen))
 		n, err = r.conn.Read(b)
 		if err != nil {
-			log.Println("[ERROR]:", err)
-			return
+			logger.Err(err)
+			continue
 		}
 
 		// log.Println("data", len(b[:n]), b[:n])
 		// return
 		data, err := protocol.ByteToMsg(b[:n])
 		if err != nil {
-			log.Println("[ERROR]:", err)
-			return
+			logger.Err(err)
+			continue
 		}
 		switch data["type"] {
 		case "loginres":
-			r.login <- true
 			// 加入组
 			r.conn.Write(protocol.MsgToByte(map[string]string{
 				"type": "joingroup",
@@ -88,9 +169,9 @@ func receiveMsg(r *Room) {
 				r.barrage <- data
 			}
 		case "uenter":
-			// 进入放假
-			if r.joinSwitch {
-				r.join <- data
+			// 进入房间
+			if r.userEnterSwitch {
+				r.userEnter <- data
 			}
 
 		default:
@@ -99,39 +180,72 @@ func receiveMsg(r *Room) {
 		if r.allMsgSwitch {
 			r.allMsg <- data
 		}
+
 	}
 }
 
-// 用户进入直播间
-func (r *Room) JoinRoom(chanSize int) <-chan map[string]string {
-	r.joinSwitch = true
-	r.join = make(chan map[string]string, chanSize)
-	return r.join
+/*
+	设置用户进入直播间channel大小
+*/
+func (r *Room) SetUserEnterChanSize(chanSize int64) {
+	r.userEnterChanSize = chanSize
 }
 
-// 接收弹幕消息
-func (r *Room) ReceiveBarrage(chanSize int) <-chan map[string]string {
+/*
+	设置弹幕消息channel大小
+*/
+func (r *Room) SetBarrageChanSize(chanSize int64) {
+	r.barrageChanSize = chanSize
+}
+
+/*
+	设置全部消息channel大小
+*/
+func (r *Room) SetAllMsgChanSize(chanSize int64) {
+	r.allMsgChanSize = chanSize
+}
+
+/*
+	用户进入直播间
+*/
+func (r *Room) UserEnterRoom() <-chan map[string]string {
+	r.userEnterSwitch = true
+	var size int64
+	if r.userEnterChanSize > 0 {
+		size = r.userEnterChanSize
+	} else {
+		size = common.UserEnterChanSize
+	}
+	r.userEnter = make(chan map[string]string, size)
+	return r.userEnter
+}
+
+/*
+	接收弹幕消息
+*/
+func (r *Room) ReceiveBarrage() <-chan map[string]string {
 	r.barrageSwitch = true
-	r.barrage = make(chan map[string]string, chanSize)
+	var size int64
+	if r.barrageChanSize > 0 {
+		size = r.barrageChanSize
+	} else {
+		size = common.BarrageChanSize
+	}
+	r.barrage = make(chan map[string]string, size)
 	return r.barrage
 }
 
-// 接收所有消息
-func (r *Room) ReceiveAll(chanSize int) <-chan map[string]string {
+/*
+	接收所有消息
+*/
+func (r *Room) ReceiveAll() <-chan map[string]string {
 	r.allMsgSwitch = true
-	r.allMsg = make(chan map[string]string, chanSize)
-	return r.allMsg
-}
-
-// 客户端与服务器保持连接
-func (r *Room) keepConnection() {
-	<-r.login
-	close(r.login)
-	for {
-		r.conn.Write(protocol.MsgToByte(map[string]string{
-			"type": "mrkl",
-		}))
-		t, _ := time.ParseDuration(heartbe)
-		time.Sleep(t)
+	var size int64
+	if r.allMsgChanSize > 0 {
+		size = r.allMsgChanSize
+	} else {
+		size = common.AllMsgChanSize
 	}
+	r.allMsg = make(chan map[string]string, size)
+	return r.allMsg
 }
