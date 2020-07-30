@@ -1,12 +1,10 @@
 package protocol
 
 import (
-	// "bytes"
 	"bytes"
 	"encoding/binary"
-
-	// "io"
 	"strings"
+	"unsafe"
 )
 
 const (
@@ -26,14 +24,14 @@ func serializeMsg(msg map[string]string) string {
 }
 
 // 反序列化消息
-func unserializeMsg(str string) map[string]string {
+func unserializeMsg(str *string) map[string]string {
 	m := make(map[string]string)
-	if str[len(str)-1:] != string(0) {
+	if (*str)[len(*str)-1:] != string(0) {
 		return m
 	}
 	// 截取最后的空字符和/
-	str = str[:len(str)-2]
-	slis := strings.Split(str, "/")
+	*str = (*str)[:len(*str)-2]
+	slis := strings.Split(*str, "/")
 	if len(slis) <= 1 {
 		return m
 	}
@@ -85,10 +83,8 @@ func MsgToByte(msg map[string]string) []byte {
 }
 
 // 解析数据
-func ByteToMsg(data []byte) (m map[string]string, err error) {
-	str := string(data)
-
+func ByteToMsg(data []byte) map[string]string {
+	str := (*string)(unsafe.Pointer(&data))
 	// 反序列化
-	m = unserializeMsg(str)
-	return
+	return unserializeMsg(str)
 }

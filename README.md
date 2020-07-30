@@ -83,6 +83,7 @@ func main() {
 
 * https://github.com/itpika/douyumsg/blob/master/%E6%96%97%E9%B1%BC%E5%BC%B9%E5%B9%95%E6%9C%8D%E5%8A%A1%E5%99%A8%E7%AC%AC%E4%B8%89%E6%96%B9%E6%8E%A5%E5%85%A5%E5%8D%8F%E8%AE%AEv1.6.2.pdf
 
+* 官方文档 https://open.douyu.com/source/api/63
 
 ___
 作者： itpika

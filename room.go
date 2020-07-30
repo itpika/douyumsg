@@ -19,14 +19,14 @@ type msgChannel struct {
 
 // room对象可以与服务器建立tcp连接，并与之通信
 type Room struct {
-	RoomId                                             string
-	conn                                               net.Conn
-	heart                                              int64
-	barrageSwitch, allMsgSwitch, userEnterSwitch       bool
-	barrageChanSize, allMsgChanSize, userEnterChanSize int64
-	barrage, allMsg, userEnter                         chan map[string]string
-	exit                                               bool
-	wg                                                 sync.WaitGroup
+	RoomId                                                           string
+	conn                                                             net.Conn
+	heart                                                            int64
+	barrageSwitch, allMsgSwitch, userEnterSwitch, giftSwitch         bool
+	barrageChanSize, allMsgChanSize, userEnterChanSize, giftChanSize int64
+	barrage, allMsg, userEnter, gift                                 chan map[string]string
+	exit                                                             bool
+	wg                                                               sync.WaitGroup
 }
 
 /*
@@ -126,6 +126,9 @@ func (r *Room) receiveMsg() {
 			if r.barrageSwitch {
 				close(r.barrage)
 			}
+			if r.giftSwitch {
+				close(r.gift)
+			}
 			r.wg.Done()
 			logger.Info("receiveMsg exit")
 			break
@@ -150,19 +153,10 @@ func (r *Room) receiveMsg() {
 
 		// log.Println("data", len(b[:n]), b[:n])
 		// return
-		data, err := protocol.ByteToMsg(b[:n])
-		if err != nil {
-			logger.Err(err)
-			continue
-		}
+		data := protocol.ByteToMsg(b[:n])
+
 		switch data["type"] {
-		case "loginres":
-			// 加入组
-			r.conn.Write(protocol.MsgToByte(map[string]string{
-				"type": "joingroup",
-				"rid":  r.RoomId,
-				"gid":  "-9999",
-			}))
+
 		case "chatmsg":
 			// 弹幕发送
 			if r.barrageSwitch {
@@ -173,7 +167,18 @@ func (r *Room) receiveMsg() {
 			if r.userEnterSwitch {
 				r.userEnter <- data
 			}
-
+		case "dgb":
+			// 赠送礼物
+			if r.giftSwitch {
+				r.gift <- data
+			}
+		case "loginres":
+			// 加入组
+			r.conn.Write(protocol.MsgToByte(map[string]string{
+				"type": "joingroup",
+				"rid":  r.RoomId,
+				"gid":  "-9999",
+			}))
 		default:
 			continue
 		}
@@ -185,7 +190,14 @@ func (r *Room) receiveMsg() {
 }
 
 /*
-	设置用户进入直播间channel大小
+	设置用户赠送礼物消息channel大小
+*/
+func (r *Room) SetgiftChanSize(chanSize int64) {
+	r.giftChanSize = chanSize
+}
+
+/*
+	设置用户进入直播间消息channel大小
 */
 func (r *Room) SetUserEnterChanSize(chanSize int64) {
 	r.userEnterChanSize = chanSize
@@ -206,9 +218,24 @@ func (r *Room) SetAllMsgChanSize(chanSize int64) {
 }
 
 /*
+	赠送礼物
+*/
+func (r *Room) Gify() <-chan map[string]string {
+	r.giftSwitch = true
+	var size int64
+	if r.giftChanSize > 0 {
+		size = r.giftChanSize
+	} else {
+		size = common.GiftChanSize
+	}
+	r.gift = make(chan map[string]string, size)
+	return r.gift
+}
+
+/*
 	用户进入直播间
 */
-func (r *Room) UserEnterRoom() <-chan map[string]string {
+func (r *Room) UserEnter() <-chan map[string]string {
 	r.userEnterSwitch = true
 	var size int64
 	if r.userEnterChanSize > 0 {

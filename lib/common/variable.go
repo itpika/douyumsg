@@ -11,4 +11,5 @@ const (
 	UserEnterChanSize int64 = 50  // 用户进入房间消息channel大小
 	BarrageChanSize   int64 = 100 // 弹幕消息channel大小
 	AllMsgChanSize    int64 = 300 // 全部消息channel大小
+	GiftChanSize      int64 = 30  // 赠送礼物消息channel大小
 )
