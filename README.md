@@ -88,8 +88,7 @@ func main() {
 	//	msg := <-room.ReceiveAll(100)
 	//	fmt.Println(msg)
 	//}
-	// time.Sleep(time.Second * 5)
-	// room.Stop()
+	// room.Stop() 终止消息接收
 	runtime.Goexit()
 }
 
