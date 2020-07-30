@@ -26,6 +26,8 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/itpika/douyumsg/lib/logger"
+
 	"github.com/itpika/douyumsg"
 )
 
@@ -43,28 +45,42 @@ func main() {
 	room.SetBarrageChanSize(200)  // 设置弹幕消息channel大小，默认100
 	room.SetUserEnterChanSize(20) // 设置弹幕消息channel大小，默认50
 	room.SetAllMsgChanSize(400)   // 设置弹幕消息channel大小，默认300
-	// 获取弹幕消息，传入chan缓冲区大小，返回一个chan
+	room.SetgiftChanSize(10)      // 设置礼物消息channel大小，默认30
+	// 获取弹幕消息
 	go func() {
 		msg := room.ReceiveBarrage()
 		for {
 			m := <-msg
 			if m == nil {
-				println("弹幕消息通道关闭")
+				println("弹幕消息队列关闭")
 				break
 			}
-			fmt.Println("level:", m["level"], m["nn"], ":", m["txt"])
+			logger.Infof("等级:[%s] %s : %s\n", m["level"], m["nn"], m["txt"])
 		}
 	}()
-	// 获取用户进入房间通知
+	// 获取礼物消息
 	go func() {
-		msg := room.UserEnterRoom()
+		msg := room.Gify()
 		for {
 			m := <-msg
 			if m == nil {
-				println("进入房间通道关闭")
+				println("礼物消息队列关闭")
 				break
 			}
-			fmt.Println("用户：", "level:", m["level"], m["nn"], "进入直播间")
+			logger.Infof("等级:[%s] %s 赠送了%s个礼物， %s连击\n", m["level"], m["nn"], m["gfcnt"], m["hits"])
+
+		}
+	}()
+	// 获取用户进入房间消息
+	go func() {
+		msg := room.UserEnter()
+		for {
+			m := <-msg
+			if m == nil {
+				println("进入房间队列关闭")
+				break
+			}
+			logger.Infof("等级:[%s] %s : 进入直播间\n", m["level"], m["nn"])
 		}
 	}()
 	// 获取所有消息，同样返回一个chan，需要自己对消息进行过滤处理，格式参考斗鱼弹幕服务器第三方接入协议v1.6.2.pdf
@@ -76,6 +92,7 @@ func main() {
 	// room.Stop()
 	runtime.Goexit()
 }
+
 
 ```
 
