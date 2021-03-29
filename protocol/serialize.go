@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"bytes"
 	"encoding/binary"
 	"strings"
 	"unsafe"
@@ -14,14 +13,31 @@ const (
 )
 
 // 序列化消息
-func serializeMsg(msg map[string]string) string {
-	var buf bytes.Buffer
+func serializeMsg(msg map[string]string) []byte {
+	buf := make([]byte, 0, 100)
 	for k, v := range msg {
-		buf.WriteString(k + "@=" + v + "/")
+		for i, _ := range k {
+			buf = append(buf, k[i])
+		}
+		buf = append(buf, '@', '=')
+		for i, _ := range v {
+			buf = append(buf, v[i])
+		}
+		buf = append(buf, '/')
 	}
-	buf.WriteByte(0)
-	return buf.String()
+	buf = append(buf, 0)
+	return buf
 }
+
+//// 序列化消息
+//func serializeMsg(msg map[string]string) []byte {
+//	var buf bytes.Buffer
+//	for k, v := range msg {
+//		buf.WriteString(k + "@=" + v + "/")
+//	}
+//	buf.WriteByte(0)
+//	return buf.Bytes()
+//}
 
 // 反序列化消息
 func unserializeMsg(str *string) map[string]string {
@@ -52,14 +68,12 @@ func combinationProtocolHead(msg map[string]string) []byte {
 		return make([]byte, 0)
 	}
 	// 序列化
-	s := serializeMsg(msg)
+	body := serializeMsg(msg)
 	// fmt.Println(s, len(s))
 
 	// 计算头长度
 	head := make([]byte, HeadLen*2+MsgTypeLen+KeepLen)
 	// head := make([]byte, 0)
-
-	body := []byte(s)
 
 	// 计算总长度
 
