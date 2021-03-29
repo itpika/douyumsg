@@ -2,14 +2,14 @@ package douyumsg
 
 import (
 	"encoding/binary"
-	"io"
-	"net"
-	"sync"
-	"time"
-
 	"github.com/itpika/douyumsg/lib/common"
 	"github.com/itpika/douyumsg/lib/logger"
 	"github.com/itpika/douyumsg/protocol"
+	"io"
+	"net"
+	"strconv"
+	"sync"
+	"time"
 )
 
 type msgChannel struct {
@@ -19,8 +19,9 @@ type msgChannel struct {
 
 // room对象可以与服务器建立tcp连接，并与之通信
 type Room struct {
-	RoomId                                                           string
-	conn                                                             net.Conn
+	RoomId string
+	conn   net.Conn
+	// 心跳间隔: seconds
 	heart                                                            int64
 	barrageSwitch, allMsgSwitch, userEnterSwitch, giftSwitch         bool
 	barrageChanSize, allMsgChanSize, userEnterChanSize, giftChanSize int64
@@ -57,11 +58,14 @@ func (r *Room) Run(addr string) error {
 	if _, err := conn.Write(protocol.MsgToByte(map[string]string{
 		"type":   "loginreq",
 		"roomid": r.RoomId,
+		"time":   strconv.Itoa(int(time.Now().Unix())),
 	})); err != nil {
 		logger.Err(err)
 		return err
 	}
+	// 心跳
 	go r.keepConnection()
+	// 接收消息
 	go r.receiveMsg()
 	return nil
 }
@@ -99,13 +103,10 @@ func (r *Room) keepConnection() error {
 		})); err != nil {
 			return err
 		}
-		var second int64
-		if r.heart > 0 {
-			second = r.heart
-		} else {
-			second = common.Heartbe
+		if r.heart <= 0 {
+			r.heart = common.Heartbe
 		}
-		time.Sleep(time.Second * time.Duration(second))
+		time.Sleep(time.Second * time.Duration(r.heart))
 	}
 	return nil
 }
@@ -115,6 +116,7 @@ func (r *Room) keepConnection() error {
 */
 func (r *Room) receiveMsg() {
 	r.wg.Add(1)
+	h := make([]byte, protocol.HeadLen*2+protocol.MsgTypeLen+protocol.KeepLen)
 	for {
 		if r.exit {
 			if r.userEnterSwitch {
@@ -134,7 +136,6 @@ func (r *Room) receiveMsg() {
 			break
 		}
 		// 读取协议头
-		h := make([]byte, protocol.HeadLen*2+protocol.MsgTypeLen+protocol.KeepLen)
 		n, err := r.conn.Read(h)
 		if err != nil {
 			if err == io.EOF {
@@ -173,11 +174,11 @@ func (r *Room) receiveMsg() {
 				r.gift <- data
 			}
 		case "loginres":
-			// 加入组
+			// 登陆弹幕服务器后，加入房间组
 			r.conn.Write(protocol.MsgToByte(map[string]string{
 				"type": "joingroup",
 				"rid":  r.RoomId,
-				"gid":  "-9999",
+				"time": strconv.Itoa(int(time.Now().Unix())),
 			}))
 		default:
 			continue
@@ -186,6 +187,9 @@ func (r *Room) receiveMsg() {
 			r.allMsg <- data
 		}
 
+		for i, _ := range h {
+			h[i] = 0
+		}
 	}
 }
 
@@ -222,13 +226,10 @@ func (r *Room) SetAllMsgChanSize(chanSize int64) {
 */
 func (r *Room) Gify() <-chan map[string]string {
 	r.giftSwitch = true
-	var size int64
-	if r.giftChanSize > 0 {
-		size = r.giftChanSize
-	} else {
-		size = common.GiftChanSize
+	if r.giftChanSize <= 0 {
+		r.giftChanSize = common.GiftChanSize
 	}
-	r.gift = make(chan map[string]string, size)
+	r.gift = make(chan map[string]string, r.giftChanSize)
 	return r.gift
 }
 
@@ -237,13 +238,10 @@ func (r *Room) Gify() <-chan map[string]string {
 */
 func (r *Room) UserEnter() <-chan map[string]string {
 	r.userEnterSwitch = true
-	var size int64
-	if r.userEnterChanSize > 0 {
-		size = r.userEnterChanSize
-	} else {
-		size = common.UserEnterChanSize
+	if r.userEnterChanSize <= 0 {
+		r.userEnterChanSize = common.UserEnterChanSize
 	}
-	r.userEnter = make(chan map[string]string, size)
+	r.userEnter = make(chan map[string]string, r.userEnterChanSize)
 	return r.userEnter
 }
 
@@ -252,13 +250,10 @@ func (r *Room) UserEnter() <-chan map[string]string {
 */
 func (r *Room) ReceiveBarrage() <-chan map[string]string {
 	r.barrageSwitch = true
-	var size int64
-	if r.barrageChanSize > 0 {
-		size = r.barrageChanSize
-	} else {
-		size = common.BarrageChanSize
+	if r.barrageChanSize <= 0 {
+		r.barrageChanSize = common.BarrageChanSize
 	}
-	r.barrage = make(chan map[string]string, size)
+	r.barrage = make(chan map[string]string, r.barrageChanSize)
 	return r.barrage
 }
 
@@ -267,12 +262,9 @@ func (r *Room) ReceiveBarrage() <-chan map[string]string {
 */
 func (r *Room) ReceiveAll() <-chan map[string]string {
 	r.allMsgSwitch = true
-	var size int64
-	if r.allMsgChanSize > 0 {
-		size = r.allMsgChanSize
-	} else {
-		size = common.AllMsgChanSize
+	if r.allMsgChanSize <= 0 {
+		r.allMsgChanSize = common.AllMsgChanSize
 	}
-	r.allMsg = make(chan map[string]string, size)
+	r.allMsg = make(chan map[string]string, r.allMsgChanSize)
 	return r.allMsg
 }
